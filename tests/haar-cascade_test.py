@@ -1,38 +1,80 @@
 import cv2 as cv
 from pathlib import Path
+#from imgbeddings import imgbeddings
+#from PIL import Image
+# import numpy
+import psycopg2
+import os
+import uuid
+
 
 # Replace with the path to your Haar cascade model file
 parent_dir_path = str(Path(Path(__file__)).parents[1])
-haar_cascade_path = parent_dir_path + '\data\haarcascades\haarcascade_frontalface_alt.xml'
+haar_cascade_path = parent_dir_path + '\data\haarcascades\haarcascade_frontalface_default.xml'
 input_path = parent_dir_path + '\input'
 output_path = parent_dir_path + '\output'
 
-# Load the Haar cascade classifier
-face_cascade = cv.CascadeClassifier(haar_cascade_path)
+# Connecting to database
+#connection = psycopg2.connect(HIDDEN)
 
-# Load the image
-img = cv.imread(input_path + '\image.png')
-
-# Convert the image to grayscale (improves processing speed)
-gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-# Detect faces in the grayscale image
-faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+def load_inputs(input_path):
+  # Load the Haar cascade classifier
+  face_cascade = cv.CascadeClassifier(haar_cascade_path)
+  for filename in os.listdir(input_path):
+    # Load the image
+    print(f"Began working on {filename}!")
+    img = cv.imread(input_path + "/" + filename)
+    # Convert the image to grayscale (improves processing speed)
+    gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    # Detect faces in the grayscale image
+    faces = face_cascade.detectMultiScale(gray_img, 1.1, 4)
+    draw_rectangle(faces, img)
+    
 
 # Draw a red rectangle around each detected face
-for (x, y, w, h) in faces:
-  cv.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+def draw_rectangle(faces, img):
+  for (x, y, w, h) in faces:
+    cv.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+    # Generate a unique filename with numbering to avoid overwriting
+    unique_filename = output_path + "/" + uuid.uuid4().hex + ".png"
+    # Save the image with the bounding box
+    cv.imwrite(unique_filename, img)
+    print(f"Successfully finished {unique_filename} and saved to {output_path}!")
 
-  # Generate a unique filename with numbering to avoid overwriting
-  unique_filename = f"{output_path}/test_output1.png"
-  # Save the image with the bounding box
-  cv.imwrite(unique_filename, img)
+def post_imbeddings(connection):
+  for filename in os.listdir(output_path):
+    # opening the image
+    img = Image.open(output_path + "/" +filename)
+    # loading the `imgbeddings`
+    ibed = imgbeddings()
+    # calculating the embeddings
+    embedding = ibed.to_embeddings(img)
+    cur = connection.cursor()
+    cur.execute("INSERT INTO pictures values (%s,%s)", (filename, embedding[0].tolist()))
+    print(filename)
+  connection.commit()
 
-# Display the image with the drawn boxes
-cv.imshow('Image with Faces Detected', img)
+def calculate_embedding(file_name):
+  # opening the image
+  img = Image.open(file_name)
+  # loading the `imgbeddings`
+  ibed = imgbeddings()
+  # calculating the embeddings
+  return ibed.to_embeddings(img)
 
-# Wait for a key press to close the window
-cv.waitKey(0)
-# Close all OpenCV windows
-cv.destroyAllWindows()
+def fetch_highest_similarity(connection, embedding):
+  cur = connection.cursor()
+  string_representation = "["+ ",".join(str(x) for x in embedding[0].tolist()) +"]"
+  cur.execute("SELECT * FROM pictures ORDER BY embedding <-> %s LIMIT 1;", (string_representation,))
+  rows = cur.fetchall()
+  for row in rows:
+      print(row[0])
+  cur.close()
 
-print(f"Face detection completed and saved to {output_path}!")
+
+def main():
+  load_inputs(input_path)
+
+
+if __name__=="__main__":
+  main()
