@@ -15,7 +15,7 @@ input_path = parent_dir_path + '\input'
 output_path = parent_dir_path + '\output'
 
 # Connecting to database
-connection = psycopg2.connect()
+connection = psycopg2.connect(HIDDEN)
 
 def load_inputs(input_path):
   # Load the Haar cascade classifier
@@ -42,31 +42,16 @@ def draw_rectangle(faces, img):
     print(f"Successfully finished {unique_filename} and saved to {output_path}!")
 
 def post_imbeddings(connection):
-  for filename in os.listdir(input_path):
+  for filename in os.listdir(output_path):
     # opening the image
-    img = Image.open(input_path + "/" + filename)
+    img = Image.open(output_path + "/" +filename)
     # loading the `imgbeddings`
     ibed = imgbeddings()
     # calculating the embeddings
     embedding = ibed.to_embeddings(img)
     cur = connection.cursor()
-    try:
-      # Check if a record with the filename already exists
-      cur.execute("SELECT * FROM pictures WHERE filename = %s", (filename,))
-      existing_record = cur.fetchone()
-
-      if not existing_record:
-        # Insert only if the filename doesn't exist
-        cur.execute("INSERT INTO pictures values (%s,%s)", (filename, embedding[0].tolist()))
-        connection.commit()
-      else:
-        print(f"Skipping insertion: filename '{filename}' already exists.")
-
-    except Exception as e:
-      print(f"Error during insertion: {e}")
-      # Handle other potential errors here (e.g., database connection issues)
-      connection.rollback()  # Rollback the transaction if an error occurs
-    print(filename + "imbedding completed")
+    cur.execute("INSERT INTO pictures values (%s,%s)", (filename, embedding[0].tolist()))
+    print(filename)
   connection.commit()
 
 def calculate_embedding(file_name):
@@ -89,10 +74,9 @@ def fetch_highest_similarity(connection, embedding):
 
 def main():
   load_inputs(input_path)
-  post_imbeddings(connection)
 
-  embedding = calculate_embedding(input_path + "/image_7.png")
-  fetch_highest_similarity(connection, embedding)
+  imgbedding = calculate_embedding(input_path + "/image_7.png")
+  fetch_highest_similarity(connection, imgbedding)
 
 
 if __name__=="__main__":
