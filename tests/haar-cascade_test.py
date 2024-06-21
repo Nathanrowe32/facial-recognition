@@ -15,7 +15,7 @@ input_path = parent_dir_path + '\input'
 output_path = parent_dir_path + '\output'
 
 # Connecting to database
-connection = psycopg2.connect('postgres://avnadmin:AVNS_VHT7AL-JwG9MWUdLhzl@pg-21e1b198-facial-recognition-project.g.aivencloud.com:12703/defaultdb?sslmode=require')
+connection = psycopg2.connect()
 
 def load_inputs(input_path):
   # Load the Haar cascade classifier
